@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="pt-pt" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Prazos - PREV</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            bg: '#0f172a',
+                            card: '#1e293b',
+                            text: '#f1f5f9'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; transition: background-color 0.3s ease, color 0.3s ease; }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .dark .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2); }
+        .loading-overlay { background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+    </style>
+</head>
+<body class="min-h-screen pb-12 bg-slate-50 text-slate-900 dark:bg-dark-bg dark:text-dark-text">
+
+    <!-- Ecrã de Carregamento -->
+    <div id="loading-screen" class="fixed inset-0 z-[100] flex items-center justify-center loading-overlay">
+        <div class="text-center text-white">
+            <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-white mx-auto mb-4"></div>
+            <p id="loading-text" class="font-medium">A autenticar...</p>
+        </div>
+    </div>
+
+    <!-- Barra de Navegação -->
+    <nav class="bg-indigo-700 dark:bg-indigo-900 text-white p-4 sticky top-0 z-50 shadow-md">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <i class="fas fa-calendar-check"></i> Controle de Prazos - PREV
+            </h1>
+            <div class="flex items-center gap-4">
+                <button onclick="toggleDarkMode()" class="p-2 rounded-full hover:bg-indigo-600 transition-colors">
+                    <i id="theme-icon" class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 mt-6">
+        <!-- Sumário de Prazos -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <div class="bg-white dark:bg-dark-card border-l-4 border-red-500 p-4 rounded-lg card-shadow">
+                <div class="flex items-center">
+                    <div class="p-3 bg-red-100 dark:bg-red-900/30 rounded-full mr-4 text-red-600 dark:text-red-400">
+                        <i class="fas fa-exclamation-circle text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-gray-800 dark:text-gray-200 text-sm uppercase">Prazos Vencidos</h3>
+                        <p id="overdue-count" class="text-2xl font-bold text-red-600 dark:text-red-400">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-dark-card border-l-4 border-yellow-500 p-4 rounded-lg card-shadow">
+                <div class="flex items-center">
+                    <div class="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-full mr-4 text-yellow-600 dark:text-yellow-400">
+                        <i class="fas fa-clock text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-gray-800 dark:text-gray-200 text-sm uppercase">Próximo do Vencimento</h3>
+                        <p id="warning-count" class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-col lg:flex-row gap-6">
+            <!-- Coluna de Perfis -->
+            <aside class="w-full lg:w-1/4">
+                <div class="bg-white dark:bg-dark-card p-6 rounded-xl card-shadow">
+                    <div class="flex justify-between items-center mb-4 border-b dark:border-slate-700 pb-2">
+                        <h2 class="font-bold text-gray-500 dark:text-gray-400 uppercase text-xs tracking-wider">Perfis</h2>
+                        <button onclick="openProfileModal()" class="text-indigo-600 hover:scale-110 transition-transform">
+                            <i class="fas fa-plus-circle text-xl"></i>
+                        </button>
+                    </div>
+                    <ul id="profile-list" class="space-y-2"></ul>
+                </div>
+            </aside>
+
+            <!-- Área de Processos -->
+            <main class="w-full lg:w-3/4">
+                <div id="process-container" class="bg-white dark:bg-dark-card p-6 rounded-xl card-shadow min-h-[400px]">
+                    <div id="no-profile-selected" class="flex flex-col items-center justify-center h-full text-gray-400 py-20">
+                        <i class="fas fa-folder-open text-6xl mb-4 opacity-20"></i>
+                        <p class="text-center">Selecione um perfil para gerenciar os processos.</p>
+                    </div>
+                    
+                    <div id="process-content" class="hidden">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b dark:border-slate-700 pb-4">
+                            <div>
+                                <h2 id="active-profile-name" class="text-2xl font-bold text-indigo-900 dark:text-indigo-300"></h2>
+                                <p class="text-xs text-gray-400">Sincronizado em tempo real</p>
+                            </div>
+                            <button onclick="openProcessModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2">
+                                <i class="fas fa-plus"></i> Novo Processo
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead>
+                                    <tr class="text-gray-400 text-xs uppercase tracking-wider border-b dark:border-slate-700">
+                                        <th class="py-3 px-4">N.º do Processo</th>
+                                        <th class="py-3 px-4">Aguardando Resposta de...</th>
+                                        <th class="py-3 px-4">Data Limite</th>
+                                        <th class="py-3 px-4 text-center">Status</th>
+                                        <th class="py-3 px-4 text-right">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="process-list" class="divide-y divide-gray-100 dark:divide-slate-800"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal Perfil -->
+    <div id="modal-profile" class="fixed inset-0 bg-black/60 flex items-center justify-center hidden z-50 p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-dark-card rounded-xl p-6 w-full max-w-md shadow-2xl">
+            <h3 id="modal-profile-title" class="text-xl font-bold mb-4">Perfil</h3>
+            <input type="hidden" id="input-profile-id">
+            <input type="text" id="input-profile-name" placeholder="Nome do perfil..." class="w-full p-3 border dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-white rounded-lg mb-4 outline-none">
+            <div class="flex justify-end gap-3">
+                <button onclick="toggleModal('modal-profile')" class="px-4 py-2 text-gray-500">Cancelar</button>
+                <button onclick="handleSaveProfile()" class="px-6 py-2 bg-indigo-600 text-white rounded-lg">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmação Exclusão Perfil -->
+    <div id="modal-confirm-delete" class="fixed inset-0 bg-black/60 flex items-center justify-center hidden z-[60] p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-dark-card rounded-xl p-6 w-full max-w-sm shadow-2xl text-center">
+            <div class="text-red-500 text-5xl mb-4"><i class="fas fa-exclamation-triangle"></i></div>
+            <h3 class="text-xl font-bold mb-2">Eliminar Perfil?</h3>
+            <p class="text-gray-500 dark:text-gray-400 mb-6">Esta ação apagará o perfil e todos os processos vinculados a ele. Não pode ser desfeita.</p>
+            <input type="hidden" id="delete-profile-target-id">
+            <div class="flex justify-center gap-3">
+                <button onclick="toggleModal('modal-confirm-delete')" class="px-4 py-2 bg-gray-100 dark:bg-slate-800 rounded-lg">Cancelar</button>
+                <button onclick="executeDeleteProfile()" class="px-6 py-2 bg-red-600 text-white rounded-lg">Sim, Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Processo -->
+    <div id="modal-process" class="fixed inset-0 bg-black/60 flex items-center justify-center hidden z-50 p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-dark-card rounded-xl p-6 w-full max-w-lg shadow-2xl">
+            <h3 id="modal-process-title" class="text-xl font-bold mb-4">Novo Processo</h3>
+            <input type="hidden" id="input-proc-id">
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase">N.º do Processo</label>
+                    <input type="text" id="input-proc-number" placeholder="Ex: 000123-2024" class="w-full p-3 border dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-white rounded-lg outline-none">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase">Aguardando Resposta de...</label>
+                    <input type="text" id="input-proc-waiting" placeholder="Ex: Órgão Central, Cartório..." class="w-full p-3 border dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-white rounded-lg outline-none">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase">Data Limite</label>
+                    <input type="date" id="input-proc-date" class="w-full p-3 border dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-white rounded-lg outline-none">
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-8">
+                <button onclick="toggleModal('modal-process')" class="px-4 py-2 text-gray-500">Sair</button>
+                <button onclick="handleSaveProcess()" class="px-6 py-2 bg-indigo-600 text-white rounded-lg">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'coord-shared-v1';
+
+        window.appState = {
+            profiles: [],
+            processes: [],
+            activeProfileId: null,
+            user: null,
+            darkMode: localStorage.getItem('theme') === 'dark'
+        };
+
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Erro na autenticação:", error);
+                document.getElementById('loading-text').innerText = "Erro de conexão.";
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            window.appState.user = user;
+            if (user) setupSharedSync();
+        });
+
+        initAuth();
+
+        function setupSharedSync() {
+            if (!window.appState.user) return;
+            document.getElementById('loading-text').innerText = "Sincronizando...";
+
+            const profilesRef = collection(db, 'artifacts', appId, 'public', 'data', 'profiles');
+            const processesRef = collection(db, 'artifacts', appId, 'public', 'data', 'processes');
+
+            onSnapshot(profilesRef, (snap) => {
+                window.appState.profiles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderProfiles();
+                document.getElementById('loading-screen').classList.add('hidden');
+            }, (err) => console.error("Erro Perfis:", err));
+
+            onSnapshot(processesRef, (snap) => {
+                window.appState.processes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderProcesses();
+                updateAlerts();
+            }, (err) => console.error("Erro Processos:", err));
+        }
+
+        // --- Perfil ---
+        window.openProfileModal = (id = null) => {
+            const inputId = document.getElementById('input-profile-id');
+            const inputName = document.getElementById('input-profile-name');
+            const title = document.getElementById('modal-profile-title');
+            
+            if (id) {
+                const p = window.appState.profiles.find(x => x.id === id);
+                inputId.value = id;
+                inputName.value = p.name;
+                title.innerText = "Editar Perfil";
+            } else {
+                inputId.value = '';
+                inputName.value = '';
+                title.innerText = "Novo Perfil";
+            }
+            toggleModal('modal-profile');
+        };
+
+        window.handleSaveProfile = async () => {
+            if (!window.appState.user) return;
+            const name = document.getElementById('input-profile-name').value.trim();
+            const id = document.getElementById('input-profile-id').value || "prof_" + Date.now();
+            if (!name) return;
+            
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', id), {
+                name,
+                updatedAt: serverTimestamp()
+            }, { merge: true });
+            
+            toggleModal('modal-profile');
+        };
+
+        window.confirmDeleteProfile = (e, id) => {
+            e.stopPropagation(); // Impede de selecionar o perfil ao clicar no lixo
+            document.getElementById('delete-profile-target-id').value = id;
+            toggleModal('modal-confirm-delete');
+        };
+
+        window.executeDeleteProfile = async () => {
+            const id = document.getElementById('delete-profile-target-id').value;
+            if (!window.appState.user || !id) return;
+            
+            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', id));
+            
+            // Apaga processos vinculados
+            const toDelete = window.appState.processes.filter(p => p.profileId === id);
+            for(const p of toDelete) {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'processes', p.id));
+            }
+            
+            if (window.appState.activeProfileId === id) window.appState.activeProfileId = null;
+            toggleModal('modal-confirm-delete');
+        };
+
+        // --- Processo ---
+        window.handleSaveProcess = async () => {
+            if (!window.appState.user) return;
+            const pid = document.getElementById('input-proc-id').value || "proc_" + Date.now();
+            const data = {
+                number: document.getElementById('input-proc-number').value,
+                waitingFor: document.getElementById('input-proc-waiting').value,
+                date: document.getElementById('input-proc-date').value,
+                profileId: window.appState.activeProfileId,
+                updatedAt: serverTimestamp()
+            };
+            if (!data.number || !data.date) return;
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'processes', pid), data);
+            toggleModal('modal-process');
+        };
+
+        window.handleDeleteProcess = async (id) => {
+            if (window.appState.user && confirm("Eliminar este processo?")) {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'processes', id));
+            }
+        };
+
+        // --- UI ---
+        window.setActiveProfile = (id) => {
+            window.appState.activeProfileId = id;
+            renderProfiles();
+            renderProcesses();
+        };
+
+        window.toggleModal = (id) => document.getElementById(id).classList.toggle('hidden');
+
+        window.toggleDarkMode = () => {
+            window.appState.darkMode = !window.appState.darkMode;
+            document.documentElement.classList.toggle('dark', window.appState.darkMode);
+            localStorage.setItem('theme', window.appState.darkMode ? 'dark' : 'light');
+            document.getElementById('theme-icon').className = window.appState.darkMode ? 'fas fa-sun' : 'fas fa-moon';
+        };
+
+        window.openProcessModal = (id = null) => {
+            const fields = { id: 'input-proc-id', n: 'input-proc-number', w: 'input-proc-waiting', d: 'input-proc-date' };
+            if (id) {
+                const p = window.appState.processes.find(x => x.id === id);
+                document.getElementById(fields.id).value = id;
+                document.getElementById(fields.n).value = p.number;
+                document.getElementById(fields.w).value = p.waitingFor;
+                document.getElementById(fields.d).value = p.date;
+            } else {
+                Object.values(fields).forEach(f => document.getElementById(f).value = '');
+            }
+            toggleModal('modal-process');
+        };
+
+        function renderProfiles() {
+            const list = document.getElementById('profile-list');
+            list.innerHTML = '';
+            [...window.appState.profiles].sort((a,b) => a.name.localeCompare(b.name)).forEach(p => {
+                const active = window.appState.activeProfileId === p.id;
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <div class="group flex justify-between items-center p-3 rounded-lg cursor-pointer transition-all ${active ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}" onclick="setActiveProfile('${p.id}')">
+                        <span class="flex-grow font-medium truncate pr-2">${p.name}</span>
+                        <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="event.stopPropagation(); openProfileModal('${p.id}')" class="${active ? 'text-indigo-200' : 'text-indigo-400'} hover:scale-110 p-1">
+                                <i class="fas fa-pen text-xs"></i>
+                            </button>
+                            <button onclick="confirmDeleteProfile(event, '${p.id}')" class="${active ? 'text-red-200' : 'text-red-400'} hover:scale-110 p-1">
+                                <i class="fas fa-trash-alt text-xs"></i>
+                            </button>
+                        </div>
+                    </div>`;
+                list.appendChild(li);
+            });
+        }
+
+        function renderProcesses() {
+            const list = document.getElementById('process-list');
+            const cont = document.getElementById('process-content');
+            const placeholder = document.getElementById('no-profile-selected');
+            
+            if (!window.appState.activeProfileId) {
+                cont.classList.add('hidden');
+                placeholder.classList.remove('hidden');
+                return;
+            }
+
+            cont.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+            list.innerHTML = '';
+
+            const filtered = window.appState.processes.filter(p => p.profileId === window.appState.activeProfileId);
+            const activeProfile = window.appState.profiles.find(p => p.id === window.appState.activeProfileId);
+            document.getElementById('active-profile-name').innerText = activeProfile?.name || '';
+
+            if (filtered.length === 0) {
+                list.innerHTML = '<tr><td colspan="5" class="py-12 text-center text-gray-400">Nenhum processo neste perfil.</td></tr>';
+                return;
+            }
+
+            filtered.sort((a,b) => new Date(a.date) - new Date(b.date)).forEach(p => {
+                const s = getStatus(p.date);
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors";
+                tr.innerHTML = `
+                    <td class="p-4 font-bold border-b dark:border-slate-800">${p.number}</td>
+                    <td class="p-4 opacity-70 border-b dark:border-slate-800">${p.waitingFor || '-'}</td>
+                    <td class="p-4 opacity-70 border-b dark:border-slate-800 font-mono">${formatDate(p.date)}</td>
+                    <td class="p-4 text-center border-b dark:border-slate-800">
+                        <span class="px-3 py-1 rounded-full text-[10px] font-bold ${s.class}">${s.text}</span>
+                    </td>
+                    <td class="p-4 text-right border-b dark:border-slate-800">
+                        <button onclick="openProcessModal('${p.id}')" class="p-2 text-indigo-400 hover:text-indigo-600"><i class="fas fa-edit"></i></button>
+                        <button onclick="handleDeleteProcess('${p.id}')" class="p-2 text-red-400 hover:text-red-600"><i class="fas fa-trash-alt"></i></button>
+                    </td>`;
+                list.appendChild(tr);
+            });
+        }
+
+        function updateAlerts() {
+            let o = 0, w = 0;
+            window.appState.processes.forEach(p => {
+                const s = getStatus(p.date);
+                if (s.type === 'overdue') o++; else if (s.type === 'warning') w++;
+            });
+            document.getElementById('overdue-count').innerText = o;
+            document.getElementById('warning-count').innerText = w;
+        }
+
+        function getStatus(d) {
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const limit = new Date(d);
+            limit.setHours(0,0,0,0);
+            const diff = Math.ceil((limit - today) / 86400000);
+
+            if (diff < 0) return { text: 'VENCIDO', class: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400', type: 'overdue' };
+            if (diff <= 1) return { text: 'URGENTE', class: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400', type: 'warning' };
+            return { text: 'OK', class: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400', type: 'ok' };
+        }
+
+        function formatDate(d) {
+            if (!d) return '-';
+            const parts = d.split('-');
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+
+        if (window.appState.darkMode) document.documentElement.classList.add('dark');
+    </script>
+</body>
+</html>
