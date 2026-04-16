@@ -36,8 +36,15 @@
     <div id="loading-screen" class="fixed inset-0 z-[100] flex items-center justify-center loading-overlay">
         <div class="text-center text-white px-4">
             <div id="loading-spinner" class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-white mx-auto mb-4"></div>
-            <p id="loading-text" class="font-medium text-lg">A autenticar...</p>
-            <p id="error-help" class="hidden mt-4 text-sm text-red-200">Verifique a consola do navegador para mais detalhes.</p>
+            <p id="loading-text" class="font-medium text-lg">A conectar à nuvem...</p>
+            <div id="setup-help" class="hidden mt-6 p-4 bg-white/10 rounded-lg text-left max-w-sm mx-auto border border-white/20">
+                <p class="text-sm font-bold mb-2">Como corrigir isto:</p>
+                <ol class="text-xs space-y-2 list-decimal ml-4 opacity-90">
+                    <li>Crie um projeto em <a href="https://console.firebase.google.com" target="_blank" class="underline">Firebase Console</a></li>
+                    <li>Crie um "App Web" e copie o objeto <b>firebaseConfig</b></li>
+                    <li>Substitua no código a variável <b>manualConfig</b> pelos seus dados.</li>
+                </ol>
+            </div>
         </div>
     </div>
 
@@ -56,7 +63,7 @@
     </nav>
 
     <div class="container mx-auto px-4 mt-6">
-        <!-- Sumário de Prazos -->
+        <!-- Sumário -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             <div class="bg-white dark:bg-dark-card border-l-4 border-red-500 p-4 rounded-lg card-shadow">
                 <div class="flex items-center">
@@ -83,7 +90,6 @@
         </div>
 
         <div class="flex flex-col lg:flex-row gap-6">
-            <!-- Coluna de Perfis -->
             <aside class="w-full lg:w-1/4">
                 <div class="bg-white dark:bg-dark-card p-6 rounded-xl card-shadow">
                     <div class="flex justify-between items-center mb-4 border-b dark:border-slate-700 pb-2">
@@ -96,7 +102,6 @@
                 </div>
             </aside>
 
-            <!-- Área de Processos -->
             <main class="w-full lg:w-3/4">
                 <div id="process-container" class="bg-white dark:bg-dark-card p-6 rounded-xl card-shadow min-h-[400px]">
                     <div id="no-profile-selected" class="flex flex-col items-center justify-center h-full text-gray-400 py-20">
@@ -134,7 +139,7 @@
         </div>
     </div>
 
-    <!-- Modal Perfil -->
+    <!-- Modais -->
     <div id="modal-profile" class="fixed inset-0 bg-black/60 flex items-center justify-center hidden z-50 p-4 backdrop-blur-sm">
         <div class="bg-white dark:bg-dark-card rounded-xl p-6 w-full max-w-md shadow-2xl">
             <h3 id="modal-profile-title" class="text-xl font-bold mb-4">Perfil</h3>
@@ -147,12 +152,11 @@
         </div>
     </div>
 
-    <!-- Modal Confirmação Exclusão Perfil -->
     <div id="modal-confirm-delete" class="fixed inset-0 bg-black/60 flex items-center justify-center hidden z-[60] p-4 backdrop-blur-sm">
         <div class="bg-white dark:bg-dark-card rounded-xl p-6 w-full max-w-sm shadow-2xl text-center">
             <div class="text-red-500 text-5xl mb-4"><i class="fas fa-exclamation-triangle"></i></div>
             <h3 class="text-xl font-bold mb-2">Eliminar Perfil?</h3>
-            <p class="text-gray-500 dark:text-gray-400 mb-6">Esta ação apagará o perfil e todos os processos vinculados a ele. Não pode ser desfeita.</p>
+            <p class="text-gray-500 dark:text-gray-400 mb-6 text-sm">Esta ação apagará o perfil e todos os processos. Não pode ser desfeita.</p>
             <input type="hidden" id="delete-profile-target-id">
             <div class="flex justify-center gap-3">
                 <button onclick="toggleModal('modal-confirm-delete')" class="px-4 py-2 bg-gray-100 dark:bg-slate-800 rounded-lg">Cancelar</button>
@@ -161,7 +165,6 @@
         </div>
     </div>
 
-    <!-- Modal Processo -->
     <div id="modal-process" class="fixed inset-0 bg-black/60 flex items-center justify-center hidden z-50 p-4 backdrop-blur-sm">
         <div class="bg-white dark:bg-dark-card rounded-xl p-6 w-full max-w-lg shadow-2xl">
             <h3 id="modal-process-title" class="text-xl font-bold mb-4">Novo Processo</h3>
@@ -169,11 +172,11 @@
             <div class="space-y-4">
                 <div>
                     <label class="text-xs font-bold text-gray-500 uppercase">N.º do Processo</label>
-                    <input type="text" id="input-proc-number" placeholder="Ex: 000123-2024" class="w-full p-3 border dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-white rounded-lg outline-none">
+                    <input type="text" id="input-proc-number" class="w-full p-3 border dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-white rounded-lg outline-none">
                 </div>
                 <div>
                     <label class="text-xs font-bold text-gray-500 uppercase">Aguardando Resposta de...</label>
-                    <input type="text" id="input-proc-waiting" placeholder="Ex: Órgão Central, Cartório..." class="w-full p-3 border dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-white rounded-lg outline-none">
+                    <input type="text" id="input-proc-waiting" class="w-full p-3 border dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-white rounded-lg outline-none">
                 </div>
                 <div>
                     <label class="text-xs font-bold text-gray-500 uppercase">Data Limite</label>
@@ -192,202 +195,124 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Configuração de Fallback para GitHub Pages ---
-        let firebaseConfig = {};
+        // --- ÁREA DE CONFIGURAÇÃO (IMPORTANTE) ---
+        // Se estiver no GitHub Pages, você precisa colocar seus dados aqui dentro das {}
+        const manualConfig = null; 
+
+        let firebaseConfig = null;
         try {
-            firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+            // Tenta pegar a config automática do sistema
+            firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : manualConfig;
         } catch (e) {
-            console.error("Erro ao ler configuração do Firebase:", e);
+            firebaseConfig = manualConfig;
         }
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'coord-shared-v1';
-
-        // Se não houver config, o app não pode prosseguir. 
         if (!firebaseConfig) {
-            document.getElementById('loading-text').innerText = "Configuração do Firebase ausente.";
+            document.getElementById('loading-text').innerText = "Configuração em falta.";
             document.getElementById('loading-spinner').classList.add('hidden');
-            document.getElementById('error-help').classList.remove('hidden');
-            throw new Error("Firebase Config is missing. Are you running this outside the intended environment?");
-        }
+            document.getElementById('setup-help').classList.remove('hidden');
+        } else {
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'meu-gestor-prazos';
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+            window.appState = {
+                profiles: [],
+                processes: [],
+                activeProfileId: null,
+                user: null,
+                darkMode: localStorage.getItem('theme') === 'dark'
+            };
 
-        window.appState = {
-            profiles: [],
-            processes: [],
-            activeProfileId: null,
-            user: null,
-            darkMode: localStorage.getItem('theme') === 'dark'
-        };
-
-        // --- Função de Backoff para Retry de Conexão (Robustez) ---
-        async function fetchWithRetry(fn, retries = 5, delay = 1000) {
-            for (let i = 0; i < retries; i++) {
-                try { return await fn(); }
-                catch (err) {
-                    if (i === retries - 1) throw err;
-                    await new Promise(r => setTimeout(r, delay));
-                    delay *= 2;
+            const initAuth = async () => {
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (error) {
+                    console.error("Erro Auth:", error);
+                    document.getElementById('loading-text').innerText = "Erro de Ligação.";
                 }
-            }
-        }
+            };
 
-        const initAuth = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await fetchWithRetry(() => signInWithCustomToken(auth, __initial_auth_token));
-                } else {
-                    await fetchWithRetry(() => signInAnonymously(auth));
-                }
-            } catch (error) {
-                console.error("Erro na autenticação:", error);
-                document.getElementById('loading-text').innerText = "Falha na ligação à nuvem. Recarregue a página.";
-                document.getElementById('error-help').classList.remove('hidden');
-            }
-        };
+            onAuthStateChanged(auth, (user) => {
+                window.appState.user = user;
+                if (user) {
+                    const profilesRef = collection(db, 'artifacts', appId, 'public', 'data', 'profiles');
+                    const processesRef = collection(db, 'artifacts', appId, 'public', 'data', 'processes');
 
-        onAuthStateChanged(auth, (user) => {
-            window.appState.user = user;
-            if (user) {
-                setupSharedSync();
-            } else {
-                // Caso o utilizador saia por algum motivo
-                document.getElementById('loading-screen').classList.remove('hidden');
-                document.getElementById('loading-text').innerText = "A autenticar...";
-            }
-        });
+                    onSnapshot(profilesRef, (snap) => {
+                        window.appState.profiles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                        renderProfiles();
+                        document.getElementById('loading-screen').classList.add('hidden');
+                    });
 
-        initAuth();
-
-        function setupSharedSync() {
-            if (!window.appState.user) return;
-            document.getElementById('loading-text').innerText = "A sincronizar dados...";
-
-            const profilesRef = collection(db, 'artifacts', appId, 'public', 'data', 'profiles');
-            const processesRef = collection(db, 'artifacts', appId, 'public', 'data', 'processes');
-
-            // Listener de Perfis
-            onSnapshot(profilesRef, (snap) => {
-                window.appState.profiles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                renderProfiles();
-                // Remove o loading apenas quando os perfis (dados iniciais) chegarem
-                document.getElementById('loading-screen').classList.add('hidden');
-            }, (err) => {
-                console.error("Erro Firestore Perfis:", err);
-                if (err.code === 'permission-denied') {
-                    document.getElementById('loading-text').innerText = "Acesso Negado. Verifique as permissões.";
+                    onSnapshot(processesRef, (snap) => {
+                        window.appState.processes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                        renderProcesses();
+                        updateAlerts();
+                    });
                 }
             });
 
-            // Listener de Processos
-            onSnapshot(processesRef, (snap) => {
-                window.appState.processes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                renderProcesses();
-                updateAlerts();
-            }, (err) => {
-                console.error("Erro Firestore Processos:", err);
-            });
-        }
+            initAuth();
 
-        // --- Funções de Escrita ---
-        window.handleSaveProfile = async () => {
-            if (!window.appState.user) return;
-            const name = document.getElementById('input-profile-name').value.trim();
-            const id = document.getElementById('input-profile-id').value || "prof_" + Date.now();
-            if (!name) return;
-            
-            try {
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', id), {
-                    name,
-                    updatedAt: serverTimestamp()
-                }, { merge: true });
+            // --- Operações CRUD ---
+            window.handleSaveProfile = async () => {
+                const name = document.getElementById('input-profile-name').value.trim();
+                const id = document.getElementById('input-profile-id').value || "prof_" + Date.now();
+                if (!name || !window.appState.user) return;
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', id), { name, updatedAt: serverTimestamp() }, { merge: true });
                 toggleModal('modal-profile');
-            } catch (err) {
-                console.error("Erro ao salvar perfil:", err);
-            }
-        };
+            };
 
-        window.confirmDeleteProfile = (e, id) => {
-            e.stopPropagation();
-            document.getElementById('delete-profile-target-id').value = id;
-            toggleModal('modal-confirm-delete');
-        };
-
-        window.executeDeleteProfile = async () => {
-            const id = document.getElementById('delete-profile-target-id').value;
-            if (!window.appState.user || !id) return;
-            
-            try {
+            window.executeDeleteProfile = async () => {
+                const id = document.getElementById('delete-profile-target-id').value;
+                if (!id || !window.appState.user) return;
                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', id));
-                const toDelete = window.appState.processes.filter(p => p.profileId === id);
-                for(const p of toDelete) {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'processes', p.id));
-                }
+                const linked = window.appState.processes.filter(p => p.profileId === id);
+                for(const p of linked) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'processes', p.id));
                 if (window.appState.activeProfileId === id) window.appState.activeProfileId = null;
                 toggleModal('modal-confirm-delete');
-            } catch (err) {
-                console.error("Erro ao eliminar:", err);
-            }
-        };
-
-        window.handleSaveProcess = async () => {
-            if (!window.appState.user) return;
-            const pid = document.getElementById('input-proc-id').value || "proc_" + Date.now();
-            const data = {
-                number: document.getElementById('input-proc-number').value,
-                waitingFor: document.getElementById('input-proc-waiting').value,
-                date: document.getElementById('input-proc-date').value,
-                profileId: window.appState.activeProfileId,
-                updatedAt: serverTimestamp()
             };
-            if (!data.number || !data.date) return;
-            
-            try {
+
+            window.handleSaveProcess = async () => {
+                const pid = document.getElementById('input-proc-id').value || "proc_" + Date.now();
+                const data = {
+                    number: document.getElementById('input-proc-number').value,
+                    waitingFor: document.getElementById('input-proc-waiting').value,
+                    date: document.getElementById('input-proc-date').value,
+                    profileId: window.appState.activeProfileId,
+                    updatedAt: serverTimestamp()
+                };
+                if (!data.number || !data.date || !window.appState.user) return;
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'processes', pid), data);
                 toggleModal('modal-process');
-            } catch (err) {
-                console.error("Erro ao salvar processo:", err);
-            }
-        };
+            };
 
-        window.handleDeleteProcess = async (id) => {
-            if (window.appState.user && confirm("Eliminar este processo?")) {
-                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'processes', id));
-            }
-        };
+            window.handleDeleteProcess = async (id) => {
+                if (confirm("Eliminar este processo?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'processes', id));
+            };
+        }
 
-        // --- Gestão de UI ---
-        window.setActiveProfile = (id) => {
-            window.appState.activeProfileId = id;
-            renderProfiles();
-            renderProcesses();
-        };
-
+        // --- Funções UI Globais ---
         window.toggleModal = (id) => document.getElementById(id).classList.toggle('hidden');
-
-        window.toggleDarkMode = () => {
-            window.appState.darkMode = !window.appState.darkMode;
-            document.documentElement.classList.toggle('dark', window.appState.darkMode);
-            localStorage.setItem('theme', window.appState.darkMode ? 'dark' : 'light');
-            document.getElementById('theme-icon').className = window.appState.darkMode ? 'fas fa-sun' : 'fas fa-moon';
-        };
-
+        window.setActiveProfile = (id) => { window.appState.activeProfileId = id; renderProfiles(); renderProcesses(); };
+        window.confirmDeleteProfile = (e, id) => { e.stopPropagation(); document.getElementById('delete-profile-target-id').value = id; toggleModal('modal-confirm-delete'); };
+        
         window.openProfileModal = (id = null) => {
             const inputId = document.getElementById('input-profile-id');
             const inputName = document.getElementById('input-profile-name');
-            const title = document.getElementById('modal-profile-title');
-            
             if (id) {
                 const p = window.appState.profiles.find(x => x.id === id);
-                inputId.value = id;
-                inputName.value = p.name;
-                title.innerText = "Editar Perfil";
+                inputId.value = id; inputName.value = p.name;
+                document.getElementById('modal-profile-title').innerText = "Editar Perfil";
             } else {
-                inputId.value = '';
-                inputName.value = '';
-                title.innerText = "Novo Perfil";
+                inputId.value = ''; inputName.value = '';
+                document.getElementById('modal-profile-title').innerText = "Novo Perfil";
             }
             toggleModal('modal-profile');
         };
@@ -409,19 +334,15 @@
         function renderProfiles() {
             const list = document.getElementById('profile-list');
             list.innerHTML = '';
-            [...window.appState.profiles].sort((a,b) => a.name.localeCompare(b.name)).forEach(p => {
+            window.appState.profiles.sort((a,b) => a.name.localeCompare(b.name)).forEach(p => {
                 const active = window.appState.activeProfileId === p.id;
                 const li = document.createElement('li');
                 li.innerHTML = `
                     <div class="group flex justify-between items-center p-3 rounded-lg cursor-pointer transition-all ${active ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}" onclick="setActiveProfile('${p.id}')">
-                        <span class="flex-grow font-medium truncate pr-2">${p.name}</span>
+                        <span class="flex-grow font-medium truncate pr-2 text-sm">${p.name}</span>
                         <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onclick="event.stopPropagation(); openProfileModal('${p.id}')" class="${active ? 'text-indigo-200' : 'text-indigo-400'} hover:scale-110 p-1">
-                                <i class="fas fa-pen text-xs"></i>
-                            </button>
-                            <button onclick="confirmDeleteProfile(event, '${p.id}')" class="${active ? 'text-red-200' : 'text-red-400'} hover:scale-110 p-1">
-                                <i class="fas fa-trash-alt text-xs"></i>
-                            </button>
+                            <button onclick="event.stopPropagation(); openProfileModal('${p.id}')" class="p-1 hover:scale-110"><i class="fas fa-pen text-[10px]"></i></button>
+                            <button onclick="confirmDeleteProfile(event, '${p.id}')" class="p-1 hover:scale-110"><i class="fas fa-trash-alt text-[10px]"></i></button>
                         </div>
                     </div>`;
                 list.appendChild(li);
@@ -432,73 +353,53 @@
             const list = document.getElementById('process-list');
             const cont = document.getElementById('process-content');
             const placeholder = document.getElementById('no-profile-selected');
-            
-            if (!window.appState.activeProfileId) {
-                cont.classList.add('hidden');
-                placeholder.classList.remove('hidden');
-                return;
-            }
-
-            cont.classList.remove('hidden');
-            placeholder.classList.add('hidden');
+            if (!window.appState.activeProfileId) { cont.classList.add('hidden'); placeholder.classList.remove('hidden'); return; }
+            cont.classList.remove('hidden'); placeholder.classList.add('hidden');
             list.innerHTML = '';
-
             const filtered = window.appState.processes.filter(p => p.profileId === window.appState.activeProfileId);
-            const activeProfile = window.appState.profiles.find(p => p.id === window.appState.activeProfileId);
-            document.getElementById('active-profile-name').innerText = activeProfile?.name || '';
-
-            if (filtered.length === 0) {
-                list.innerHTML = '<tr><td colspan="5" class="py-12 text-center text-gray-400">Nenhum processo neste perfil.</td></tr>';
-                return;
-            }
-
+            document.getElementById('active-profile-name').innerText = window.appState.profiles.find(p => p.id === window.appState.activeProfileId)?.name || '';
+            if (filtered.length === 0) { list.innerHTML = '<tr><td colspan="5" class="py-12 text-center text-gray-400 text-sm">Nenhum processo aqui.</td></tr>'; return; }
             filtered.sort((a,b) => new Date(a.date) - new Date(b.date)).forEach(p => {
                 const s = getStatus(p.date);
                 const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors";
+                tr.className = "hover:bg-slate-50 dark:hover:bg-slate-800/50 text-sm";
                 tr.innerHTML = `
                     <td class="p-4 font-bold border-b dark:border-slate-800">${p.number}</td>
                     <td class="p-4 opacity-70 border-b dark:border-slate-800">${p.waitingFor || '-'}</td>
-                    <td class="p-4 opacity-70 border-b dark:border-slate-800 font-mono">${formatDate(p.date)}</td>
-                    <td class="p-4 text-center border-b dark:border-slate-800">
-                        <span class="px-3 py-1 rounded-full text-[10px] font-bold ${s.class}">${s.text}</span>
-                    </td>
+                    <td class="p-4 opacity-70 border-b dark:border-slate-800">${formatDate(p.date)}</td>
+                    <td class="p-4 text-center border-b dark:border-slate-800"><span class="px-2 py-1 rounded-full text-[9px] font-bold ${s.class}">${s.text}</span></td>
                     <td class="p-4 text-right border-b dark:border-slate-800">
-                        <button onclick="openProcessModal('${p.id}')" class="p-2 text-indigo-400 hover:text-indigo-600"><i class="fas fa-edit"></i></button>
-                        <button onclick="handleDeleteProcess('${p.id}')" class="p-2 text-red-400 hover:text-red-600"><i class="fas fa-trash-alt"></i></button>
+                        <button onclick="openProcessModal('${p.id}')" class="p-1 text-indigo-400"><i class="fas fa-edit"></i></button>
+                        <button onclick="handleDeleteProcess('${p.id}')" class="p-1 text-red-400"><i class="fas fa-trash-alt"></i></button>
                     </td>`;
                 list.appendChild(tr);
             });
         }
 
+        function getStatus(d) {
+            const diff = Math.ceil((new Date(d).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000);
+            if (diff < 0) return { text: 'VENCIDO', class: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' };
+            if (diff <= 1) return { text: 'URGENTE', class: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400' };
+            return { text: 'OK', class: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' };
+        }
+
         function updateAlerts() {
             let o = 0, w = 0;
             window.appState.processes.forEach(p => {
-                const s = getStatus(p.date);
-                if (s.type === 'overdue') o++; else if (s.type === 'warning') w++;
+                const diff = Math.ceil((new Date(p.date).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000);
+                if (diff < 0) o++; else if (diff <= 1) w++;
             });
             document.getElementById('overdue-count').innerText = o;
             document.getElementById('warning-count').innerText = w;
         }
 
-        function getStatus(d) {
-            const today = new Date();
-            today.setHours(0,0,0,0);
-            const limit = new Date(d);
-            limit.setHours(0,0,0,0);
-            const diff = Math.ceil((limit - today) / 86400000);
-
-            if (diff < 0) return { text: 'VENCIDO', class: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400', type: 'overdue' };
-            if (diff <= 1) return { text: 'URGENTE', class: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400', type: 'warning' };
-            return { text: 'OK', class: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400', type: 'ok' };
-        }
-
-        function formatDate(d) {
-            if (!d) return '-';
-            const parts = d.split('-');
-            return `${parts[2]}/${parts[1]}/${parts[0]}`;
-        }
-
+        function formatDate(d) { const p = d.split('-'); return `${p[2]}/${p[1]}/${p[0]}`; }
+        window.toggleDarkMode = () => {
+            window.appState.darkMode = !window.appState.darkMode;
+            document.documentElement.classList.toggle('dark', window.appState.darkMode);
+            localStorage.setItem('theme', window.appState.darkMode ? 'dark' : 'light');
+            document.getElementById('theme-icon').className = window.appState.darkMode ? 'fas fa-sun' : 'fas fa-moon';
+        };
         if (window.appState.darkMode) document.documentElement.classList.add('dark');
     </script>
 </body>
