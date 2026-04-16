@@ -34,9 +34,10 @@
 
     <!-- Ecrã de Carregamento -->
     <div id="loading-screen" class="fixed inset-0 z-[100] flex items-center justify-center loading-overlay">
-        <div class="text-center text-white">
-            <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-white mx-auto mb-4"></div>
-            <p id="loading-text" class="font-medium">A autenticar...</p>
+        <div class="text-center text-white px-4">
+            <div id="loading-spinner" class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-white mx-auto mb-4"></div>
+            <p id="loading-text" class="font-medium text-lg">A autenticar...</p>
+            <p id="error-help" class="hidden mt-4 text-sm text-red-200">Verifique a consola do navegador para mais detalhes.</p>
         </div>
     </div>
 
@@ -191,11 +192,27 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = JSON.parse(__firebase_config);
+        // --- Configuração de Fallback para GitHub Pages ---
+        let firebaseConfig = {};
+        try {
+            firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        } catch (e) {
+            console.error("Erro ao ler configuração do Firebase:", e);
+        }
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'coord-shared-v1';
+
+        // Se não houver config, o app não pode prosseguir. 
+        if (!firebaseConfig) {
+            document.getElementById('loading-text').innerText = "Configuração do Firebase ausente.";
+            document.getElementById('loading-spinner').classList.add('hidden');
+            document.getElementById('error-help').classList.remove('hidden');
+            throw new Error("Firebase Config is missing. Are you running this outside the intended environment?");
+        }
+
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'coord-shared-v1';
 
         window.appState = {
             profiles: [],
@@ -205,47 +222,158 @@
             darkMode: localStorage.getItem('theme') === 'dark'
         };
 
+        // --- Função de Backoff para Retry de Conexão (Robustez) ---
+        async function fetchWithRetry(fn, retries = 5, delay = 1000) {
+            for (let i = 0; i < retries; i++) {
+                try { return await fn(); }
+                catch (err) {
+                    if (i === retries - 1) throw err;
+                    await new Promise(r => setTimeout(r, delay));
+                    delay *= 2;
+                }
+            }
+        }
+
         const initAuth = async () => {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
+                    await fetchWithRetry(() => signInWithCustomToken(auth, __initial_auth_token));
                 } else {
-                    await signInAnonymously(auth);
+                    await fetchWithRetry(() => signInAnonymously(auth));
                 }
             } catch (error) {
                 console.error("Erro na autenticação:", error);
-                document.getElementById('loading-text').innerText = "Erro de conexão.";
+                document.getElementById('loading-text').innerText = "Falha na ligação à nuvem. Recarregue a página.";
+                document.getElementById('error-help').classList.remove('hidden');
             }
         };
 
         onAuthStateChanged(auth, (user) => {
             window.appState.user = user;
-            if (user) setupSharedSync();
+            if (user) {
+                setupSharedSync();
+            } else {
+                // Caso o utilizador saia por algum motivo
+                document.getElementById('loading-screen').classList.remove('hidden');
+                document.getElementById('loading-text').innerText = "A autenticar...";
+            }
         });
 
         initAuth();
 
         function setupSharedSync() {
             if (!window.appState.user) return;
-            document.getElementById('loading-text').innerText = "Sincronizando...";
+            document.getElementById('loading-text').innerText = "A sincronizar dados...";
 
             const profilesRef = collection(db, 'artifacts', appId, 'public', 'data', 'profiles');
             const processesRef = collection(db, 'artifacts', appId, 'public', 'data', 'processes');
 
+            // Listener de Perfis
             onSnapshot(profilesRef, (snap) => {
                 window.appState.profiles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderProfiles();
+                // Remove o loading apenas quando os perfis (dados iniciais) chegarem
                 document.getElementById('loading-screen').classList.add('hidden');
-            }, (err) => console.error("Erro Perfis:", err));
+            }, (err) => {
+                console.error("Erro Firestore Perfis:", err);
+                if (err.code === 'permission-denied') {
+                    document.getElementById('loading-text').innerText = "Acesso Negado. Verifique as permissões.";
+                }
+            });
 
+            // Listener de Processos
             onSnapshot(processesRef, (snap) => {
                 window.appState.processes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderProcesses();
                 updateAlerts();
-            }, (err) => console.error("Erro Processos:", err));
+            }, (err) => {
+                console.error("Erro Firestore Processos:", err);
+            });
         }
 
-        // --- Perfil ---
+        // --- Funções de Escrita ---
+        window.handleSaveProfile = async () => {
+            if (!window.appState.user) return;
+            const name = document.getElementById('input-profile-name').value.trim();
+            const id = document.getElementById('input-profile-id').value || "prof_" + Date.now();
+            if (!name) return;
+            
+            try {
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', id), {
+                    name,
+                    updatedAt: serverTimestamp()
+                }, { merge: true });
+                toggleModal('modal-profile');
+            } catch (err) {
+                console.error("Erro ao salvar perfil:", err);
+            }
+        };
+
+        window.confirmDeleteProfile = (e, id) => {
+            e.stopPropagation();
+            document.getElementById('delete-profile-target-id').value = id;
+            toggleModal('modal-confirm-delete');
+        };
+
+        window.executeDeleteProfile = async () => {
+            const id = document.getElementById('delete-profile-target-id').value;
+            if (!window.appState.user || !id) return;
+            
+            try {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', id));
+                const toDelete = window.appState.processes.filter(p => p.profileId === id);
+                for(const p of toDelete) {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'processes', p.id));
+                }
+                if (window.appState.activeProfileId === id) window.appState.activeProfileId = null;
+                toggleModal('modal-confirm-delete');
+            } catch (err) {
+                console.error("Erro ao eliminar:", err);
+            }
+        };
+
+        window.handleSaveProcess = async () => {
+            if (!window.appState.user) return;
+            const pid = document.getElementById('input-proc-id').value || "proc_" + Date.now();
+            const data = {
+                number: document.getElementById('input-proc-number').value,
+                waitingFor: document.getElementById('input-proc-waiting').value,
+                date: document.getElementById('input-proc-date').value,
+                profileId: window.appState.activeProfileId,
+                updatedAt: serverTimestamp()
+            };
+            if (!data.number || !data.date) return;
+            
+            try {
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'processes', pid), data);
+                toggleModal('modal-process');
+            } catch (err) {
+                console.error("Erro ao salvar processo:", err);
+            }
+        };
+
+        window.handleDeleteProcess = async (id) => {
+            if (window.appState.user && confirm("Eliminar este processo?")) {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'processes', id));
+            }
+        };
+
+        // --- Gestão de UI ---
+        window.setActiveProfile = (id) => {
+            window.appState.activeProfileId = id;
+            renderProfiles();
+            renderProcesses();
+        };
+
+        window.toggleModal = (id) => document.getElementById(id).classList.toggle('hidden');
+
+        window.toggleDarkMode = () => {
+            window.appState.darkMode = !window.appState.darkMode;
+            document.documentElement.classList.toggle('dark', window.appState.darkMode);
+            localStorage.setItem('theme', window.appState.darkMode ? 'dark' : 'light');
+            document.getElementById('theme-icon').className = window.appState.darkMode ? 'fas fa-sun' : 'fas fa-moon';
+        };
+
         window.openProfileModal = (id = null) => {
             const inputId = document.getElementById('input-profile-id');
             const inputName = document.getElementById('input-profile-name');
@@ -262,80 +390,6 @@
                 title.innerText = "Novo Perfil";
             }
             toggleModal('modal-profile');
-        };
-
-        window.handleSaveProfile = async () => {
-            if (!window.appState.user) return;
-            const name = document.getElementById('input-profile-name').value.trim();
-            const id = document.getElementById('input-profile-id').value || "prof_" + Date.now();
-            if (!name) return;
-            
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', id), {
-                name,
-                updatedAt: serverTimestamp()
-            }, { merge: true });
-            
-            toggleModal('modal-profile');
-        };
-
-        window.confirmDeleteProfile = (e, id) => {
-            e.stopPropagation(); // Impede de selecionar o perfil ao clicar no lixo
-            document.getElementById('delete-profile-target-id').value = id;
-            toggleModal('modal-confirm-delete');
-        };
-
-        window.executeDeleteProfile = async () => {
-            const id = document.getElementById('delete-profile-target-id').value;
-            if (!window.appState.user || !id) return;
-            
-            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', id));
-            
-            // Apaga processos vinculados
-            const toDelete = window.appState.processes.filter(p => p.profileId === id);
-            for(const p of toDelete) {
-                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'processes', p.id));
-            }
-            
-            if (window.appState.activeProfileId === id) window.appState.activeProfileId = null;
-            toggleModal('modal-confirm-delete');
-        };
-
-        // --- Processo ---
-        window.handleSaveProcess = async () => {
-            if (!window.appState.user) return;
-            const pid = document.getElementById('input-proc-id').value || "proc_" + Date.now();
-            const data = {
-                number: document.getElementById('input-proc-number').value,
-                waitingFor: document.getElementById('input-proc-waiting').value,
-                date: document.getElementById('input-proc-date').value,
-                profileId: window.appState.activeProfileId,
-                updatedAt: serverTimestamp()
-            };
-            if (!data.number || !data.date) return;
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'processes', pid), data);
-            toggleModal('modal-process');
-        };
-
-        window.handleDeleteProcess = async (id) => {
-            if (window.appState.user && confirm("Eliminar este processo?")) {
-                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'processes', id));
-            }
-        };
-
-        // --- UI ---
-        window.setActiveProfile = (id) => {
-            window.appState.activeProfileId = id;
-            renderProfiles();
-            renderProcesses();
-        };
-
-        window.toggleModal = (id) => document.getElementById(id).classList.toggle('hidden');
-
-        window.toggleDarkMode = () => {
-            window.appState.darkMode = !window.appState.darkMode;
-            document.documentElement.classList.toggle('dark', window.appState.darkMode);
-            localStorage.setItem('theme', window.appState.darkMode ? 'dark' : 'light');
-            document.getElementById('theme-icon').className = window.appState.darkMode ? 'fas fa-sun' : 'fas fa-moon';
         };
 
         window.openProcessModal = (id = null) => {
